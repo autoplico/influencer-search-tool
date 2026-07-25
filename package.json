@@ -1,0 +1,20 @@
+{
+  "name": "influencer-search-tool",
+  "version": "1.0.0",
+  "description": "인스타그램 인플루언서를 팔로워 구간 및 참여도(바이럴/댓글) 기준으로 검색하는 도구",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node src/seed.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^2.0.1"
+  }
+}

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인플루언서 검색 툴</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>인플루언서 검색 툴</h1>
+    <p class="subtitle">팔로워 구간과 참여도(바이럴·댓글) 기준으로 협업할 인플루언서를 찾아보세요.</p>
+  </header>
+
+  <main>
+    <section class="panel" id="filters">
+      <h2>1. 팔로워 구간</h2>
+      <div class="bucket-group" id="bucketGroup"></div>
+
+      <h2>2. 참여도 필터 <span class="hint">(팔로워 대비 좋아요+댓글, 댓글 비율)</span></h2>
+      <div class="filter-row">
+        <label>
+          최소 참여율(바이럴 지수) %
+          <input type="number" id="minEngagementRate" min="0" step="0.1" placeholder="예: 5" />
+        </label>
+        <label>
+          최소 댓글 비율 %
+          <input type="number" id="minCommentRate" min="0" step="0.05" placeholder="예: 0.3" />
+        </label>
+        <label>
+          정렬 기준
+          <select id="sortBy">
+            <option value="engagementRate">바이럴 지수(참여율)</option>
+            <option value="commentRate">댓글 비율</option>
+            <option value="followerCount">팔로워수</option>
+          </select>
+        </label>
+        <label>
+          검색어
+          <input type="text" id="query" placeholder="계정명/이름 검색" />
+        </label>
+      </div>
+      <button id="searchBtn" class="primary">검색</button>
+    </section>
+
+    <section class="panel" id="results">
+      <div class="results-header">
+        <h2>검색 결과 <span id="resultCount"></span></h2>
+      </div>
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>계정</th>
+            <th>카테고리</th>
+            <th>팔로워수</th>
+            <th>평균 좋아요</th>
+            <th>평균 댓글</th>
+            <th>바이럴 지수(참여율)</th>
+            <th>댓글 비율</th>
+            <th>동기화</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="manage">
+      <h2>인플루언서 등록</h2>
+      <form id="addForm" class="add-form">
+        <input type="text" name="username" placeholder="인스타그램 계정 (@ 없이)" required />
+        <input type="text" name="displayName" placeholder="이름/브랜드명" />
+        <input type="text" name="category" placeholder="카테고리 (예: 뷰티, 푸드)" />
+        <input type="number" name="followerCount" placeholder="팔로워수" min="0" />
+        <input type="number" name="avgLikes" placeholder="평균 좋아요" min="0" step="0.1" />
+        <input type="number" name="avgComments" placeholder="평균 댓글" min="0" step="0.1" />
+        <button type="submit" class="primary">추가</button>
+      </form>
+
+      <h2>CSV로 대량 등록</h2>
+      <p class="hint">컬럼: username, displayName, category, followerCount, avgLikes, avgComments, postsSampled</p>
+      <form id="csvForm" class="csv-form">
+        <input type="file" name="file" accept=".csv" required />
+        <button type="submit">업로드</button>
+      </form>
+      <p id="csvResult" class="hint"></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      참고: 인스타그램은 팔로워수 조건으로 전체 계정을 검색하는 공개 API를 제공하지 않습니다.
+      이 툴은 직접 등록/CSV로 후보를 관리하고, Business Discovery API로 개별 계정 지표를 동기화하는 방식으로 동작합니다.
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
