@@ -1,0 +1,15 @@
+{
+  "name": "auto-highlight-editor",
+  "version": "1.0.0",
+  "description": "특정 폴더에 영상을 넣으면 자동으로 하이라이트 구간만 잘라주는 폴더 감시 도구",
+  "main": "src/watcher.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/watcher.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5"
+  }
+}
