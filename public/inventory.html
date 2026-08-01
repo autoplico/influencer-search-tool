@@ -24,6 +24,66 @@
       </table>
     </section>
 
+    <section class="panel" id="importPanel">
+      <h2>이지어드민 판매 데이터 업로드</h2>
+      <p class="hint">이지어드민에서 내려받은 판매내역 파일(.csv, .xlsx)을 업로드하면 SKU별 판매수량을 집계해 재고를 차감합니다. 세트상품 SKU가 팔린 경우 구성 단품까지 함께 차감됩니다.</p>
+      <form id="importUploadForm" class="add-form">
+        <input type="file" name="file" id="importFile" accept=".csv,.xlsx,.xlsm" required />
+        <button type="submit" class="primary">업로드</button>
+      </form>
+
+      <div id="importMapping" class="import-mapping" style="display:none;">
+        <div class="filter-row">
+          <label>
+            시트 선택
+            <select id="importSheet"></select>
+          </label>
+          <label>
+            헤더 행 번호 (0부터 시작)
+            <input type="number" id="importHeaderRow" min="0" value="0" />
+          </label>
+          <button type="button" id="importRepreview">이 설정으로 다시 미리보기</button>
+        </div>
+
+        <p class="hint">샘플 데이터 (상위 5행)</p>
+        <div style="overflow-x:auto;">
+          <table id="importSampleTable"><thead><tr id="importSampleHead"></tr></thead><tbody id="importSampleBody"></tbody></table>
+        </div>
+
+        <div class="filter-row">
+          <label>
+            SKU 컬럼 *
+            <select id="importSkuCol"></select>
+          </label>
+          <label>
+            수량 컬럼 *
+            <select id="importQtyCol"></select>
+          </label>
+          <label>
+            상태 컬럼(선택)
+            <select id="importStatusCol"><option value="">사용 안 함</option></select>
+          </label>
+          <label>
+            주문번호 컬럼(선택)
+            <select id="importMemoCol"><option value="">사용 안 함</option></select>
+          </label>
+        </div>
+        <div class="filter-row">
+          <label>
+            제외할 상태값 (쉼표로 구분, 예: 취소,반품,교환)
+            <input type="text" id="importExcludeStatuses" placeholder="취소,반품" />
+          </label>
+          <label>
+            판매 메모에 남길 출처명
+            <input type="text" id="importSourceLabel" placeholder="예: 이지어드민 8월1주" />
+          </label>
+        </div>
+        <button type="button" id="importCommit" class="primary">가져오기 실행 (재고 반영)</button>
+      </div>
+
+      <div id="importResult"></div>
+    </section>
+
     <section class="panel" id="sellPanel">
       <h2>판매 처리</h2>
       <p class="hint">세트상품을 판매하면 구성 단품(예: 색상별 낱개, 펜촉 낱개)의 재고가 함께 차감됩니다.</p>

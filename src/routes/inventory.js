@@ -1,12 +1,29 @@
 const express = require('express');
+const multer = require('multer');
 const svc = require('../inventory/service');
+const salesImport = require('../inventory/salesImport');
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
 function handle(fn) {
   return (req, res) => {
     try {
       fn(req, res);
+    } catch (e) {
+      if (e instanceof svc.InventoryError) {
+        res.status(e.status).json({ error: e.message });
+      } else {
+        res.status(500).json({ error: e.message });
+      }
+    }
+  };
+}
+
+function handleAsync(fn) {
+  return async (req, res) => {
+    try {
+      await fn(req, res);
     } catch (e) {
       if (e instanceof svc.InventoryError) {
         res.status(e.status).json({ error: e.message });
@@ -118,6 +135,35 @@ router.get(
   '/reorder-alerts',
   handle((req, res) => {
     res.json({ results: svc.reorderAlerts() });
+  })
+);
+
+// 이지어드민 등에서 내려받은 판매내역 파일(csv/xlsx) 업로드 -> SKU별 판매수량 집계 -> 재고 차감(세트는 구성품까지 연쇄 차감)
+// 1) POST /sales-import/upload (multipart 'file') - 업로드 후 기본 미리보기 반환
+// 2) GET  /sales-import/:uploadId/preview?sheetIndex=&headerRow= - 헤더행/시트를 바꿔가며 다시 미리보기
+// 3) POST /sales-import/:uploadId/commit - 컬럼 매핑을 확정해 실제 반영
+router.post(
+  '/sales-import/upload',
+  upload.single('file'),
+  handleAsync(async (req, res) => {
+    if (!req.file) throw new svc.InventoryError('업로드할 파일을 선택하세요.');
+    const uploadId = salesImport.registerUpload(req.file.buffer, req.file.originalname);
+    res.status(201).json(await salesImport.preview(uploadId));
+  })
+);
+
+router.get(
+  '/sales-import/:uploadId/preview',
+  handleAsync(async (req, res) => {
+    const { sheetIndex, headerRow } = req.query;
+    res.json(await salesImport.preview(req.params.uploadId, { sheetIndex, headerRow }));
+  })
+);
+
+router.post(
+  '/sales-import/:uploadId/commit',
+  handleAsync(async (req, res) => {
+    res.json(await salesImport.commit(req.params.uploadId, req.body || {}));
   })
 );
 

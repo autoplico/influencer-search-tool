@@ -86,3 +86,18 @@ npm start
 - `POST /api/inventory/products/:id/adjust` - 입고/수동 재고 조정 `{ delta, reason, memo }`
 - `GET /api/inventory/products/:id/movements` - 재고 변동 이력
 - `GET /api/inventory/reorder-alerts` - 재주문점 이하로 떨어진 품목 목록(발주 대상)
+
+### 이지어드민 판매 데이터 업로드로 재고 반영
+
+이지어드민 API 연동(과금) 대신, 이지어드민에서 내려받은 판매내역 파일(.csv/.xlsx)을 업로드해 SKU별 판매수량을 집계하고 재고를 차감하는 방식입니다. 재고를 이지어드민 쪽에 반영하는 것은 이 툴의 범위가 아니며, 이지어드민에서 내려받은 판매내역만 가져와 자체 재고를 갱신합니다. `/inventory.html`의 "이지어드민 판매 데이터 업로드" 패널에서 사용합니다.
+
+- 이지어드민 내보내기 양식이 상황마다 다를 수 있어(헤더 행 위치, 컬럼 순서 등), 업로드 후 헤더 행/시트/컬럼 매핑(SKU, 수량, 상태, 주문번호)을 직접 확인·조정한 뒤 반영합니다. 흔한 헤더명(상품코드, 수량, 주문상태 등)은 자동으로 추측해 미리 선택해둡니다.
+- "제외할 상태값"에 `취소,반품` 등을 입력하면 해당 상태의 행은 재고 차감에서 제외됩니다.
+- 같은 SKU가 여러 행에 걸쳐 있으면 합산 후 한 번에 차감하며, 세트 SKU면 구성 단품까지 연쇄 차감됩니다.
+- 등록되지 않은 SKU나 판매 불가 품목은 실패 목록으로 표시되고, 나머지 SKU 처리는 계속 진행됩니다(전체 실패 없음).
+
+API:
+
+- `POST /api/inventory/sales-import/upload` (multipart `file`) - 파일 업로드 후 기본 미리보기 반환(uploadId 포함, 서버 메모리에 30분간 보관)
+- `GET /api/inventory/sales-import/:uploadId/preview?sheetIndex=&headerRow=` - 시트/헤더 행을 바꿔 다시 미리보기
+- `POST /api/inventory/sales-import/:uploadId/commit` `{ sheetIndex, headerRow, skuColIdx, qtyColIdx, statusColIdx, memoColIdx, excludeStatuses, sourceLabel }` - 매핑 확정 후 실제 재고 반영

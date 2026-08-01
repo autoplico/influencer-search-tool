@@ -1,4 +1,4 @@
-const state = { products: [] };
+const state = { products: [], importPreview: null };
 
 const productsBody = document.getElementById('productsBody');
 const productCountEl = document.getElementById('productCount');
@@ -239,6 +239,113 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
     await refreshAll();
   } catch (err) {
     alert(err.message);
+  }
+});
+
+// --- 이지어드민 판매 데이터 업로드 ---
+const importMappingEl = document.getElementById('importMapping');
+const importResultEl = document.getElementById('importResult');
+const importSheetSelect = document.getElementById('importSheet');
+const importHeaderRowInput = document.getElementById('importHeaderRow');
+const importSkuColSelect = document.getElementById('importSkuCol');
+const importQtyColSelect = document.getElementById('importQtyCol');
+const importStatusColSelect = document.getElementById('importStatusCol');
+const importMemoColSelect = document.getElementById('importMemoCol');
+
+function colOptionsHtml(headers, includeNone) {
+  const opts = headers.map((h, i) => `<option value="${i}">${i}: ${h || '(빈칸)'}</option>`).join('');
+  return includeNone ? `<option value="">사용 안 함</option>${opts}` : opts;
+}
+
+function renderImportPreview(data) {
+  state.importPreview = data;
+  importMappingEl.style.display = '';
+
+  importSheetSelect.innerHTML = data.sheetNames.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  importSheetSelect.value = data.sheetIndex;
+  importHeaderRowInput.value = data.headerRow;
+
+  importSkuColSelect.innerHTML = colOptionsHtml(data.headers, false);
+  importQtyColSelect.innerHTML = colOptionsHtml(data.headers, false);
+  importStatusColSelect.innerHTML = colOptionsHtml(data.headers, true);
+  importMemoColSelect.innerHTML = colOptionsHtml(data.headers, true);
+
+  if (data.guess.skuColIdx !== null) importSkuColSelect.value = data.guess.skuColIdx;
+  if (data.guess.qtyColIdx !== null) importQtyColSelect.value = data.guess.qtyColIdx;
+  if (data.guess.statusColIdx !== null) importStatusColSelect.value = data.guess.statusColIdx;
+  if (data.guess.memoColIdx !== null) importMemoColSelect.value = data.guess.memoColIdx;
+
+  const headHtml = data.headers.map((h, i) => `<th>${i}: ${h || '(빈칸)'}</th>`).join('');
+  document.getElementById('importSampleHead').innerHTML = headHtml;
+  document.getElementById('importSampleBody').innerHTML = data.sampleRows.length
+    ? data.sampleRows.map((row) => `<tr>${data.headers.map((_, i) => `<td>${row[i] ?? ''}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="${Math.max(data.headers.length, 1)}" class="hint">데이터 행이 없습니다.</td></tr>`;
+
+  importResultEl.innerHTML = `<p class="hint">총 ${data.totalDataRows}개 데이터 행 감지됨. 컬럼을 확인한 뒤 가져오기를 실행하세요.</p>`;
+}
+
+document.getElementById('importUploadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById('importFile');
+  if (!fileInput.files.length) return;
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  document.getElementById('importSourceLabel').value = fileInput.files[0].name;
+  try {
+    const data = await fetchJson('/api/inventory/sales-import/upload', { method: 'POST', body: formData });
+    renderImportPreview(data);
+  } catch (err) {
+    importResultEl.innerHTML = `<p class="metric-low">${err.message}</p>`;
+  }
+});
+
+document.getElementById('importRepreview').addEventListener('click', async () => {
+  if (!state.importPreview) return;
+  const params = new URLSearchParams({
+    sheetIndex: importSheetSelect.value,
+    headerRow: importHeaderRowInput.value,
+  });
+  try {
+    const data = await fetchJson(`/api/inventory/sales-import/${state.importPreview.uploadId}/preview?${params.toString()}`);
+    renderImportPreview(data);
+  } catch (err) {
+    importResultEl.innerHTML = `<p class="metric-low">${err.message}</p>`;
+  }
+});
+
+document.getElementById('importCommit').addEventListener('click', async () => {
+  if (!state.importPreview) return;
+  const payload = {
+    sheetIndex: importSheetSelect.value,
+    headerRow: importHeaderRowInput.value,
+    skuColIdx: importSkuColSelect.value,
+    qtyColIdx: importQtyColSelect.value,
+    statusColIdx: importStatusColSelect.value,
+    memoColIdx: importMemoColSelect.value,
+    excludeStatuses: document.getElementById('importExcludeStatuses').value,
+    sourceLabel: document.getElementById('importSourceLabel').value,
+  };
+  try {
+    const data = await fetchJson(`/api/inventory/sales-import/${state.importPreview.uploadId}/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const successLines = data.succeeded
+      .map((s) => `- ${s.sku} ${s.name}: -${s.qty} (잔여 ${s.newStock}${s.componentCount ? `, 구성품 ${s.componentCount}종 연쇄차감` : ''})`)
+      .join('<br />');
+    const failLines = data.failed.map((f) => `- ${f.sku} (수량 ${f.qty}): ${f.reason}`).join('<br />');
+    importResultEl.innerHTML = `
+      <p class="hint">총 ${data.totalDataRows}행 중 SKU ${data.matchedSkuCount}종 처리 시도 (상태 제외 ${data.skippedByStatus}행, 무효 ${data.skippedInvalid}행)</p>
+      <p>성공 ${data.succeeded.length}건${successLines ? `:<br />${successLines}` : ''}</p>
+      ${data.failed.length ? `<p class="metric-low">실패 ${data.failed.length}건:<br />${failLines}</p>` : ''}
+    `;
+    importMappingEl.style.display = 'none';
+    document.getElementById('importUploadForm').reset();
+    state.importPreview = null;
+    await refreshAll();
+  } catch (err) {
+    importResultEl.innerHTML = `<p class="metric-low">${err.message}</p>`;
   }
 });
 
