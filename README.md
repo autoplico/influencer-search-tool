@@ -33,6 +33,22 @@ npm run seed            # 데모용 샘플 인플루언서 12명 등록
 npm start                # http://localhost:3000
 ```
 
+## 배포 (상시 접속 가능한 주소로 운영)
+
+로컬에서 `npm start`로 띄우면 내 컴퓨터에서만 접속 가능합니다. 팀에서 상시 접속 가능한 주소가 필요하면 Railway처럼 **영구 디스크(볼륨)를 지원하는 호스팅**에 올려야 합니다. 이 앱은 SQLite 파일(`data.sqlite`)에 데이터를 저장하므로, 재배포/재시작 시에도 파일이 남아있는 볼륨이 꼭 필요합니다(볼륨 없이 무료 티어에 올리면 재시작할 때마다 재고 데이터가 초기화될 수 있습니다).
+
+### Railway로 배포하기 (예시)
+
+1. [railway.app](https://railway.app)에 가입 후 "New Project" → "Deploy from GitHub repo"로 이 저장소(`autoplico/influencer-search-tool`) 선택
+2. Node.js 프로젝트를 자동 인식해 `npm install` → `npm start`로 빌드/실행합니다(별도 설정 불필요). `better-sqlite3`는 네이티브 모듈이라 빌드에 시간이 조금 더 걸릴 수 있습니다.
+3. 서비스 설정에서 **Volume(볼륨) 추가** → 마운트 경로를 예: `/data`로 지정
+4. 서비스의 환경변수(Variables)에 `DB_PATH=/data/data.sqlite` 추가 (이 값이 없으면 SQLite 파일이 컨테이너 임시 디스크에 생성되어 재배포 시 사라집니다)
+5. `PORT`는 Railway가 자동으로 주입하므로 별도 설정 불필요
+6. 배포가 끝나면 Railway가 발급하는 `https://xxxx.up.railway.app` 같은 주소로 접속 (Settings에서 커스텀 도메인 연결도 가능)
+7. 초기 데이터가 필요하면 Railway 대시보드의 Shell(또는 `railway run npm run seed:inventory`)로 1회 실행 — 실제 운영에서는 시드 대신 `/inventory.html`의 "품목 등록"으로 실제 상품을 직접 등록하는 것을 권장합니다.
+
+같은 방식(빌드 자동 인식 + 영구 볼륨 + `DB_PATH` 환경변수)은 Fly.io 등 다른 호스팅에도 동일하게 적용됩니다.
+
 ## CSV 형식
 
 ```
