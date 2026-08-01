@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>재고 관리</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <p class="nav"><a href="index.html">← 인플루언서 검색 툴</a></p>
+    <h1>재고 관리</h1>
+    <p class="subtitle">세트상품 판매 시 구성 단품 재고가 자동으로 함께 차감됩니다. (세트 안의 세트도 재귀적으로 처리)</p>
+  </header>
+
+  <main>
+    <section class="panel" id="reorderPanel">
+      <h2>재주문 알림 <span class="hint">재고가 재주문점 이하인 품목</span></h2>
+      <table id="reorderTable">
+        <thead>
+          <tr><th>SKU</th><th>이름</th><th>구분</th><th>현재재고</th><th>재주문점</th><th>부족수량</th></tr>
+        </thead>
+        <tbody id="reorderBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="sellPanel">
+      <h2>판매 처리</h2>
+      <p class="hint">세트상품을 판매하면 구성 단품(예: 색상별 낱개, 펜촉 낱개)의 재고가 함께 차감됩니다.</p>
+      <form id="sellForm" class="add-form">
+        <select name="productId" id="sellProductSelect" required></select>
+        <input type="number" name="quantity" placeholder="수량" min="1" value="1" required />
+        <input type="text" name="memo" placeholder="메모(선택)" />
+        <button type="submit" class="primary">판매 처리</button>
+      </form>
+      <div id="sellResult"></div>
+    </section>
+
+    <section class="panel" id="adjustPanel">
+      <h2>재고 조정 (입고/수동조정)</h2>
+      <p class="hint">판매되지 않는 부자재(예: 오일파스텔 도구세트 부품)도 여기서 입고 처리할 수 있습니다.</p>
+      <form id="adjustForm" class="add-form">
+        <select name="productId" id="adjustProductSelect" required></select>
+        <input type="number" name="delta" placeholder="증감수량 (입고는 +, 출고/폐기는 -)" required />
+        <input type="text" name="reason" placeholder="사유(선택, 예: purchase_in)" />
+        <input type="text" name="memo" placeholder="메모(선택)" />
+        <button type="submit" class="primary">조정 적용</button>
+      </form>
+      <div id="adjustResult"></div>
+    </section>
+
+    <section class="panel" id="bomPanel">
+      <h2>세트 구성(BOM) 관리</h2>
+      <div class="filter-row">
+        <label>
+          세트 선택
+          <select id="bomSetSelect"></select>
+        </label>
+      </div>
+      <table id="bomTable">
+        <thead>
+          <tr><th>구성품 SKU</th><th>이름</th><th>세트당 수량</th><th>현재 재고</th><th></th></tr>
+        </thead>
+        <tbody id="bomBody"></tbody>
+      </table>
+      <form id="bomAddForm" class="add-form">
+        <select name="componentProductId" id="bomComponentSelect" required></select>
+        <input type="number" name="quantity" placeholder="세트당 수량" min="1" value="1" required />
+        <button type="submit">구성품 추가</button>
+      </form>
+    </section>
+
+    <section class="panel" id="productsPanel">
+      <div class="results-header">
+        <h2>전체 품목 <span id="productCount"></span></h2>
+        <div class="filter-row" style="margin:0;">
+          <input type="text" id="productSearch" placeholder="이름/SKU 검색" />
+          <select id="productTypeFilter">
+            <option value="">전체 구분</option>
+            <option value="set">세트만</option>
+            <option value="component">단품/부자재만</option>
+          </select>
+        </div>
+      </div>
+      <table id="productsTable">
+        <thead>
+          <tr>
+            <th>SKU</th><th>이름</th><th>구분</th><th>판매가능</th><th>현재재고</th><th>재주문점</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="productsBody"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" id="createPanel">
+      <h2>품목 등록</h2>
+      <form id="createForm" class="add-form">
+        <input type="text" name="sku" placeholder="SKU" required />
+        <input type="text" name="name" placeholder="이름" required />
+        <input type="text" name="category" placeholder="카테고리(선택)" />
+        <label><input type="checkbox" name="isSet" /> 세트상품</label>
+        <label><input type="checkbox" name="isSellable" checked /> 직접판매 가능</label>
+        <input type="text" name="unit" placeholder="단위(예: 개, 세트)" />
+        <input type="number" name="stockQty" placeholder="초기재고" value="0" />
+        <input type="number" name="reorderPoint" placeholder="재주문점(선택)" />
+        <button type="submit" class="primary">등록</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      세트상품은 세트 자체 재고와 함께, BOM(세트 구성)에 등록된 하위 단품 재고도 판매 수량만큼 함께 차감됩니다.
+      세트 안에 또 다른 세트가 포함된 경우도 최하위 단품까지 재귀적으로 차감됩니다.
+    </p>
+  </footer>
+
+  <script src="inventory.js"></script>
+</body>
+</html>

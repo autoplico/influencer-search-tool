@@ -49,3 +49,40 @@ glow_skincare_jn,글로우스킨케어,뷰티,88000,9500,1300,20
 - `DELETE /api/influencers/:id` - 삭제
 - `POST /api/influencers/:id/sync` - Instagram Business Discovery로 지표 동기화
 - `POST /api/influencers/import` - CSV 업로드 (multipart, 필드명 `file`)
+
+## 재고 관리 (세트상품 BOM)
+
+`/inventory.html`에서 세트상품과 하위 단품(구성품) 재고를 함께 관리합니다. `http://localhost:3000/inventory.html`
+
+### 동작 방식
+
+- 모든 품목(단품/부자재/세트)은 `products` 테이블 한 곳에서 관리하며, 세트는 `is_set = true`로 표시합니다.
+- 세트의 구성은 `bom_items`(세트당 구성품 수량)로 정의하며, 하나의 구성품을 여러 세트가 동시에 참조할 수 있습니다.
+  - 예: "플리코 세미볼드 10색 세트", "6색 세트(파스텔)", "3색 세트(기본)"처럼 이름이 다른 세트 여러 개가 동일한 색상 낱개 재고를 공유합니다.
+- 세트를 판매(`POST /api/inventory/products/:id/sell`)하면 세트 자체 재고를 차감하고, 구성품 재고도 세트 판매 수량 × 세트당 구성 수량만큼 함께 차감됩니다.
+  - 펜촉 48개입 세트 1개 판매 → 펜촉 낱개 재고 48개 차감.
+  - 세트 안에 또 다른 세트가 포함된 경우도 재귀적으로 펼쳐서 최하위 단품까지 차감합니다(순환 참조는 등록 시 차단).
+- 구성품은 `is_sellable = false`로 등록해 "단독으로는 판매하지 않지만 재고는 추적"할 수 있습니다.
+  - 예: 오일파스텔 도구세트의 홀더/블렌딩 스틱/샤프너/트레이는 낱개로 팔지 않지만, 재주문점(`reorder_point`)을 설정해두면 부족할 때 발주 대상으로 잡아낼 수 있습니다.
+- 모든 재고 변동은 `stock_movements`에 이력으로 남습니다(판매/세트연쇄차감/입고/수동조정).
+
+### 실행
+
+```bash
+npm run seed:inventory   # 데모 데이터: 세미볼드 세트 3종 + 펜촉 세트 + 오일파스텔 도구세트
+npm start
+```
+
+### 주요 API
+
+- `GET /api/inventory/products?q=&type=set|component&low=1` - 품목 목록/검색
+- `POST /api/inventory/products` - 품목 등록 `{ sku, name, category, isSet, isSellable, unit, stockQty, reorderPoint }`
+- `GET /api/inventory/products/:id` - 품목 상세(세트면 BOM 구성 포함, 다른 세트에서 사용 중인지도 함께 조회)
+- `PUT/DELETE /api/inventory/products/:id` - 수정/삭제(구성에 사용 중이면 삭제 불가)
+- `GET/POST /api/inventory/products/:id/bom` - 세트 구성 조회/추가 `{ componentProductId, quantity }`
+- `DELETE /api/inventory/bom/:bomItemId` - 세트 구성에서 제외
+- `GET /api/inventory/products/:id/expand?quantity=` - 세트 N개 생산/판매 시 필요한 최하위 단품 총수량 미리보기(부족분 포함)
+- `POST /api/inventory/products/:id/sell` - 판매 처리 `{ quantity, memo }` (세트면 구성품까지 연쇄 차감)
+- `POST /api/inventory/products/:id/adjust` - 입고/수동 재고 조정 `{ delta, reason, memo }`
+- `GET /api/inventory/products/:id/movements` - 재고 변동 이력
+- `GET /api/inventory/reorder-alerts` - 재주문점 이하로 떨어진 품목 목록(발주 대상)

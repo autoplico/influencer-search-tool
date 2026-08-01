@@ -23,6 +23,46 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- 재고 관리: 품목(단품/세트) 및 세트 구성(BOM), 재고 변동 이력
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sku TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    category TEXT,
+    is_set INTEGER NOT NULL DEFAULT 0,
+    is_sellable INTEGER NOT NULL DEFAULT 1,
+    unit TEXT NOT NULL DEFAULT '개',
+    stock_qty INTEGER NOT NULL DEFAULT 0,
+    reorder_point INTEGER,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- 세트를 구성하는 하위 단품(BOM). parent_product_id 1개 판매 시 component_product_id가 quantity개씩 차감됨
+  CREATE TABLE IF NOT EXISTS bom_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    component_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(parent_product_id, component_product_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS stock_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    change_qty INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    ref_note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_bom_parent ON bom_items(parent_product_id);
+  CREATE INDEX IF NOT EXISTS idx_bom_component ON bom_items(component_product_id);
+  CREATE INDEX IF NOT EXISTS idx_movements_product ON stock_movements(product_id);
 `);
 
 module.exports = db;

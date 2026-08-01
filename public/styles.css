@@ -126,6 +126,13 @@ th { color: var(--muted); font-weight: 600; }
 
 .metric-high { color: var(--good); font-weight: 600; }
 .metric-mid { color: var(--warn); }
+.metric-low { color: #c0392b; font-weight: 600; }
+
+.nav { margin: 0 0 8px; }
+.nav a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+.nav a:hover { text-decoration: underline; }
+
+.results-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
 .add-form, .csv-form {
   display: flex;
@@ -156,4 +163,6 @@ footer {
     --good: #4ade80;
     --warn: #facc15;
   }
+
+  .metric-low { color: #f87171; }
 }
