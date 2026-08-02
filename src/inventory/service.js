@@ -35,6 +35,11 @@ function getProductRow(id) {
   return db.prepare('SELECT * FROM products WHERE id = ?').get(id);
 }
 
+function getProductBySku(sku) {
+  const row = db.prepare('SELECT * FROM products WHERE sku = ?').get(sku);
+  return row ? toProductDto(row) : null;
+}
+
 function requireProductRow(id) {
   const row = getProductRow(id);
   if (!row) throw new InventoryError('품목을 찾을 수 없습니다.', 404);
@@ -359,6 +364,7 @@ module.exports = {
   InventoryError,
   toProductDto,
   getProductRow,
+  getProductBySku,
   requireProductRow,
   listProducts,
   createProduct,

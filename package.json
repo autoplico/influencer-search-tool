@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node src/seed.js",
-    "seed:inventory": "node src/seed-inventory.js"
+    "seed:inventory": "node src/seed-inventory.js",
+    "seed:bom": "node src/seed-bom.js"
   },
   "license": "UNLICENSED",
   "dependencies": {
