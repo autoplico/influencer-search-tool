@@ -2,79 +2,24 @@
 // 기존 sellProduct()를 호출해 재고를 차감한다. 내보내기 양식이 매번 다를 수 있어
 // 헤더 행/컬럼 매핑을 업로드 후 미리보기 화면에서 직접 지정하도록 한다.
 const crypto = require('crypto');
-const { parse } = require('csv-parse/sync');
-const ExcelJS = require('exceljs');
 const db = require('../db');
 const svc = require('./service');
+const { sheetNamesOf, rowsOf, extOf, createUploadStore } = require('./fileParse');
 
-const uploads = new Map(); // uploadId -> { buffer, filename, ext, uploadedAt }
-const UPLOAD_TTL_MS = 30 * 60 * 1000;
-
-function sweepExpired() {
-  const now = Date.now();
-  for (const [id, u] of uploads.entries()) {
-    if (now - u.uploadedAt > UPLOAD_TTL_MS) uploads.delete(id);
-  }
-}
-const sweepTimer = setInterval(sweepExpired, 5 * 60 * 1000);
-sweepTimer.unref();
-
-function extOf(filename) {
-  const m = /\.([a-z0-9]+)$/i.exec(filename || '');
-  return m ? m[1].toLowerCase() : '';
-}
-
-function cellToPrimitive(v) {
-  if (v === null || v === undefined) return '';
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (typeof v === 'object') {
-    if ('result' in v) return v.result ?? '';
-    if ('richText' in v) return v.richText.map((t) => t.text).join('');
-    if ('text' in v) return v.text;
-    return '';
-  }
-  return v;
-}
-
-async function loadWorkbook(buffer) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
-  return workbook;
-}
-
-async function sheetNamesOf(buffer, ext) {
-  if (ext === 'csv') return ['CSV'];
-  const workbook = await loadWorkbook(buffer);
-  return workbook.worksheets.map((ws) => ws.name);
-}
-
-async function rowsOf(buffer, ext, sheetIndex = 0) {
-  if (ext === 'csv') {
-    return parse(buffer, { columns: false, skip_empty_lines: false, relax_column_count: true });
-  }
-  const workbook = await loadWorkbook(buffer);
-  const ws = workbook.worksheets[sheetIndex] || workbook.worksheets[0];
-  if (!ws) return [];
-  const rows = [];
-  ws.eachRow({ includeEmpty: true }, (row) => {
-    rows.push(row.values.slice(1).map(cellToPrimitive));
-  });
-  return rows;
-}
+const uploadStore = createUploadStore(); // uploadId -> { buffer, filename, ext, uploadedAt }
 
 function registerUpload(buffer, filename) {
   const ext = extOf(filename);
   if (!['csv', 'xlsx', 'xlsm'].includes(ext)) {
     throw new svc.InventoryError('지원하지 않는 파일 형식입니다. .csv 또는 .xlsx 파일을 업로드하세요.');
   }
-  sweepExpired();
   const uploadId = crypto.randomUUID();
-  uploads.set(uploadId, { buffer, filename, ext, uploadedAt: Date.now() });
+  uploadStore.set(uploadId, { buffer, filename, ext });
   return uploadId;
 }
 
 function getUpload(uploadId) {
-  const u = uploads.get(uploadId);
+  const u = uploadStore.get(uploadId);
   if (!u) throw new svc.InventoryError('업로드가 만료되었거나 존재하지 않습니다. 다시 업로드해주세요.', 404);
   return u;
 }
@@ -210,7 +155,7 @@ async function commit(uploadId, opts = {}) {
     }
   }
 
-  uploads.delete(uploadId);
+  uploadStore.delete(uploadId);
 
   return {
     totalDataRows: dataRows.filter((r) => (r || []).some((c) => String(c ?? '').trim() !== '')).length,

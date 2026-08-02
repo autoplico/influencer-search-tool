@@ -117,3 +117,18 @@ API:
 - `POST /api/inventory/sales-import/upload` (multipart `file`) - 파일 업로드 후 기본 미리보기 반환(uploadId 포함, 서버 메모리에 30분간 보관)
 - `GET /api/inventory/sales-import/:uploadId/preview?sheetIndex=&headerRow=` - 시트/헤더 행을 바꿔 다시 미리보기
 - `POST /api/inventory/sales-import/:uploadId/commit` `{ sheetIndex, headerRow, skuColIdx, qtyColIdx, statusColIdx, memoColIdx, excludeStatuses, sourceLabel }` - 매핑 확정 후 실제 재고 반영
+
+### 이지어드민 재고 현황 업로드로 재고 동기화 (정상재고 스냅샷)
+
+판매내역 업로드와는 별개로, 이지어드민에서 내려받는 **재고 현황** 파일(공급처, 제조사, 상품코드, 연동코드, 상품명+옵션, 원가, 정상재고, ... 컬럼)을 그대로 업로드해 SKU별 현재 재고를 동기화하는 기능입니다. `/inventory.html`의 "이지어드민 재고 현황 업로드" 패널에서 사용합니다.
+
+- **단품(색상 낱개)**: 파일의 "정상재고" 값으로 우리 재고를 그대로 덮어씁니다(판매수량 차감이 아니라 절대값 동기화).
+- **세트**: 세트 자체의 재고 숫자는 이지어드민 내부 카운터일 뿐이라 화면에 노출하지 않습니다. 대신 지난 업로드 대비 줄어든 개수(=판매량)를 계산해, 세트 구성(BOM)에 등록된 색상 재고에서 그 판매량만큼 연쇄로 차감합니다. 반대로 재고가 늘었다면(반품/재입고) 구성 색상 재고도 그만큼 되돌려 늘어납니다.
+  - 세트 구성(BOM)이 아직 등록되지 않은 세트는 차감 없이 건너뛰고 "구성 미등록" 경고로 표시됩니다. `/inventory.html`의 "세트 구성(BOM) 관리" 패널에서 먼저 색상 구성을 등록해야 합니다.
+- 파일에 있지만 아직 등록되지 않은 SKU는 상품코드/상품명/정상재고 값으로 새 품목을 자동 등록합니다(이름에 "세트"가 들어가면 세트로 추정해 등록하며, 최초 등록이라 연쇄차감 없이 기준값만 저장됩니다).
+- 전체 품목 목록은 기본적으로 "단품/부자재만" 필터로 표시됩니다(세트 재고 숫자는 참고 의미가 없으므로).
+
+API:
+
+- `POST /api/inventory/stock-sync/upload` (multipart `file`) - 파일 업로드 후 반영 계획(plan) 미리보기 반환(uploadId 포함, 서버 메모리에 30분간 보관)
+- `POST /api/inventory/stock-sync/:uploadId/commit` - 계획을 확정해 실제 반영(단품 덮어쓰기, 세트는 연쇄차감, 신규 SKU 자동 등록)

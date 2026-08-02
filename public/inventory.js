@@ -242,6 +242,61 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
   }
 });
 
+// --- 이지어드민 재고 현황 업로드 (재고 동기화) ---
+const stockSyncPreviewEl = document.getElementById('stockSyncPreview');
+const stockSyncSummaryEl = document.getElementById('stockSyncSummary');
+const stockSyncResultEl = document.getElementById('stockSyncResult');
+let stockSyncUploadId = null;
+
+document.getElementById('stockSyncUploadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById('stockSyncFile');
+  if (!fileInput.files.length) return;
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  stockSyncResultEl.innerHTML = '';
+  try {
+    const data = await fetchJson('/api/inventory/stock-sync/upload', { method: 'POST', body: formData });
+    stockSyncUploadId = data.uploadId;
+    stockSyncPreviewEl.style.display = '';
+    stockSyncSummaryEl.textContent =
+      `총 ${data.totalRows}행 중 단품 갱신 ${data.toUpdate}건, 신규 등록 ${data.toCreate}건, ` +
+      `세트 판매량 반영 ${data.setSyncCount}건, BOM 미등록 세트(건너뜀) ${data.setMissingBomCount}건` +
+      (data.skippedInvalid ? `, 무효 ${data.skippedInvalid}행` : '') +
+      (data.skippedDuplicate ? `, 중복 SKU ${data.skippedDuplicate}행` : '');
+  } catch (err) {
+    stockSyncPreviewEl.style.display = 'none';
+    stockSyncResultEl.innerHTML = `<p class="metric-low">${err.message}</p>`;
+  }
+});
+
+document.getElementById('stockSyncCommit').addEventListener('click', async () => {
+  if (!stockSyncUploadId) return;
+  try {
+    const data = await fetchJson(`/api/inventory/stock-sync/${stockSyncUploadId}/commit`, { method: 'POST' });
+    const setLines = data.setSyncs
+      .map((s) => {
+        const parts = s.cascaded.map((c) => `${c.product.name} -${c.deducted}${c.product.unit}(잔여 ${c.product.stockQty})`).join(', ');
+        return `- ${s.sku} ${s.name}: ${s.soldQty}개 판매 감지 → ${parts}`;
+      })
+      .join('<br />');
+    const skippedLines = data.setSkipped.map((s) => `- ${s.sku} ${s.name}: 구성(BOM) 미등록으로 건너뜀`).join('<br />');
+    const failLines = data.failed.map((f) => `- ${f.sku} ${f.name}: ${f.reason}`).join('<br />');
+    stockSyncResultEl.innerHTML = `
+      <p>단품 갱신 ${data.updated.length}건, 신규 등록 ${data.created.length}건</p>
+      ${setLines ? `<p class="hint">세트 판매 감지 → 색상 연쇄차감:<br />${setLines}</p>` : ''}
+      ${skippedLines ? `<p class="metric-low">구성 미등록 세트(건너뜀):<br />${skippedLines}</p>` : ''}
+      ${data.failed.length ? `<p class="metric-low">실패 ${data.failed.length}건:<br />${failLines}</p>` : ''}
+    `;
+    stockSyncPreviewEl.style.display = 'none';
+    document.getElementById('stockSyncUploadForm').reset();
+    stockSyncUploadId = null;
+    await refreshAll();
+  } catch (err) {
+    stockSyncResultEl.innerHTML = `<p class="metric-low">${err.message}</p>`;
+  }
+});
+
 // --- 이지어드민 판매 데이터 업로드 ---
 const importMappingEl = document.getElementById('importMapping');
 const importResultEl = document.getElementById('importResult');

@@ -24,6 +24,7 @@ function toProductDto(row) {
     stockQty: row.stock_qty,
     reorderPoint: row.reorder_point,
     lowStock: row.reorder_point !== null && row.stock_qty <= row.reorder_point,
+    supplier: row.supplier,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -59,15 +60,15 @@ function listProducts({ q, type, low } = {}) {
 }
 
 function createProduct(data) {
-  const { sku, name, category, isSet, isSellable, unit, stockQty, reorderPoint, notes } = data || {};
+  const { sku, name, category, isSet, isSellable, unit, stockQty, reorderPoint, notes, supplier } = data || {};
   if (!sku || !String(sku).trim()) throw new InventoryError('sku는 필수입니다.');
   if (!name || !String(name).trim()) throw new InventoryError('name은 필수입니다.');
 
   try {
     const info = db
       .prepare(
-        `INSERT INTO products (sku, name, category, is_set, is_sellable, unit, stock_qty, reorder_point, notes, updated_at)
-         VALUES (@sku, @name, @category, @isSet, @isSellable, @unit, @stockQty, @reorderPoint, @notes, datetime('now'))`
+        `INSERT INTO products (sku, name, category, is_set, is_sellable, unit, stock_qty, reorder_point, notes, supplier, updated_at)
+         VALUES (@sku, @name, @category, @isSet, @isSellable, @unit, @stockQty, @reorderPoint, @notes, @supplier, datetime('now'))`
       )
       .run({
         sku: String(sku).trim(),
@@ -79,6 +80,7 @@ function createProduct(data) {
         stockQty: Number.isFinite(Number(stockQty)) ? Math.trunc(Number(stockQty)) : 0,
         reorderPoint: reorderPoint === undefined || reorderPoint === null || reorderPoint === '' ? null : Math.trunc(Number(reorderPoint)),
         notes: notes || null,
+        supplier: supplier || null,
       });
 
     const row = getProductRow(info.lastInsertRowid);
@@ -109,6 +111,7 @@ function updateProduct(id, data) {
           : Math.trunc(Number(data.reorderPoint))
         : existing.reorder_point,
     notes: data.notes !== undefined ? data.notes || null : existing.notes,
+    supplier: data.supplier !== undefined ? data.supplier || null : existing.supplier,
   };
 
   try {
@@ -116,7 +119,7 @@ function updateProduct(id, data) {
       `UPDATE products SET
         sku = @sku, name = @name, category = @category, is_set = @is_set,
         is_sellable = @is_sellable, unit = @unit, reorder_point = @reorder_point,
-        notes = @notes, updated_at = datetime('now')
+        notes = @notes, supplier = @supplier, updated_at = datetime('now')
        WHERE id = @id`
     ).run(merged);
   } catch (e) {
@@ -269,6 +272,38 @@ const adjustStock = db.transaction((productId, delta, reason, memo) => {
   return toProductDto(getProductRow(product.id));
 });
 
+// 이지어드민 재고 현황 파일의 정상재고 값으로 현재 재고를 그대로 덮어쓴다(차감이 아니라 절대값 동기화).
+// 단품(색상 낱개)에 사용. 세트는 자체 재고 숫자를 그대로 신뢰하지 않고 cascadeSetStockChange로 처리한다.
+const setStockQty = db.transaction((productId, newQty, reason, memo) => {
+  const product = requireProductRow(productId);
+  const qty = Math.trunc(Number(newQty));
+  if (!Number.isFinite(qty)) throw new InventoryError('재고 수량이 올바르지 않습니다.');
+  const delta = qty - product.stock_qty;
+  if (delta !== 0) {
+    applyStockChange(product.id, delta, reason || 'stock_sync', memo || null);
+  }
+  return toProductDto(getProductRow(product.id));
+});
+
+// 세트 자체의 재고 숫자는 화면에 노출하지 않고, "지난 동기화 대비 몇 개가 줄었는지(soldQty)"만 받아
+// 그 수량만큼 BOM 구성 색상(단품) 재고를 연쇄로 차감한다(sellProduct의 연쇄차감과 동일한 전개 로직 재사용).
+// soldQty가 음수이면(이지어드민에서 반품/재입고 등으로 세트 재고가 늘어난 경우) 구성 단품도 그만큼 되돌려 증가한다.
+// 세트 자체의 stock_qty는 다음 번 동기화 때 차이를 계산할 수 있도록 setStockQty로 별도 저장해둔다(내부 기준값일 뿐 실사용 지표 아님).
+const cascadeSetStockChange = db.transaction((setProductId, soldQty, reason, memo) => {
+  const product = requireProductRow(setProductId);
+  if (!product.is_set) throw new InventoryError('세트 품목이 아닙니다.');
+  const qty = Math.trunc(Number(soldQty));
+  if (!Number.isFinite(qty) || qty === 0) return [];
+
+  const componentTotals = expandComponents(product.id, qty);
+  const breakdown = [];
+  for (const [componentId, totalQty] of componentTotals.entries()) {
+    applyStockChange(componentId, -totalQty, reason || 'stock_sync_cascade', memo || null);
+    breakdown.push({ productId: componentId, deducted: totalQty });
+  }
+  return breakdown.map((b) => ({ product: toProductDto(getProductRow(b.productId)), deducted: b.deducted }));
+});
+
 function reorderAlerts() {
   const rows = db
     .prepare(
@@ -334,6 +369,8 @@ module.exports = {
   removeBomItem,
   sellProduct,
   adjustStock,
+  setStockQty,
+  cascadeSetStockChange,
   reorderAlerts,
   listMovements,
   previewExpansion,

@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const svc = require('../inventory/service');
 const salesImport = require('../inventory/salesImport');
+const stockSync = require('../inventory/stockSync');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -164,6 +165,26 @@ router.post(
   '/sales-import/:uploadId/commit',
   handleAsync(async (req, res) => {
     res.json(await salesImport.commit(req.params.uploadId, req.body || {}));
+  })
+);
+
+// 이지어드민 "재고 현황" 다운로드 파일(정상재고 스냅샷) 업로드 -> 반영 계획 미리보기 -> 확정 시 SKU별 재고를 파일 값으로 덮어씀
+// (등록 안 된 SKU는 자동 등록). 판매내역 차감과 달리 절대값 동기화이며, 세트 SKU도 파일 값이 그대로 반영된다.
+// 1) POST /stock-sync/upload (multipart 'file') - 업로드 후 반영 계획(plan) 반환
+// 2) POST /stock-sync/:uploadId/commit - 계획을 확정해 실제 반영
+router.post(
+  '/stock-sync/upload',
+  upload.single('file'),
+  handleAsync(async (req, res) => {
+    if (!req.file) throw new svc.InventoryError('업로드할 파일을 선택하세요.');
+    res.status(201).json(await stockSync.upload(req.file.buffer, req.file.originalname));
+  })
+);
+
+router.post(
+  '/stock-sync/:uploadId/commit',
+  handle((req, res) => {
+    res.json(stockSync.commit(req.params.uploadId));
   })
 );
 

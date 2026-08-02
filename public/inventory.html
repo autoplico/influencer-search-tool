@@ -24,6 +24,27 @@
       </table>
     </section>
 
+    <section class="panel" id="stockSyncPanel">
+      <h2>이지어드민 재고 현황 업로드 (재고 동기화)</h2>
+      <p class="hint">
+        이지어드민에서 내려받은 재고 현황 파일(정상재고 스냅샷, .csv/.xlsx)을 업로드합니다.
+        단품(색상 낱개)은 파일의 정상재고 값으로 그대로 덮어씁니다. 세트는 세트 자체 재고 숫자를 화면에 표시하지 않고,
+        지난 업로드 대비 줄어든 개수(판매량)만큼 세트 구성(BOM)에 등록된 색상 재고를 연쇄로 차감합니다.
+        BOM이 아직 등록되지 않은 세트는 차감을 건너뛰고 경고로 표시됩니다.
+      </p>
+      <form id="stockSyncUploadForm" class="add-form">
+        <input type="file" name="file" id="stockSyncFile" accept=".csv,.xlsx,.xlsm" required />
+        <button type="submit" class="primary">업로드 후 미리보기</button>
+      </form>
+
+      <div id="stockSyncPreview" style="display:none;">
+        <p class="hint" id="stockSyncSummary"></p>
+        <button type="button" id="stockSyncCommit" class="primary">반영 실행 (재고 동기화)</button>
+      </div>
+
+      <div id="stockSyncResult"></div>
+    </section>
+
     <section class="panel" id="importPanel">
       <h2>이지어드민 판매 데이터 업로드</h2>
       <p class="hint">이지어드민에서 내려받은 판매내역 파일(.csv, .xlsx)을 업로드하면 SKU별 판매수량을 집계해 재고를 차감합니다. 세트상품 SKU가 팔린 경우 구성 단품까지 함께 차감됩니다.</p>
@@ -136,9 +157,9 @@
         <div class="filter-row" style="margin:0;">
           <input type="text" id="productSearch" placeholder="이름/SKU 검색" />
           <select id="productTypeFilter">
+            <option value="component" selected>단품/부자재만</option>
             <option value="">전체 구분</option>
             <option value="set">세트만</option>
-            <option value="component">단품/부자재만</option>
           </select>
         </div>
       </div>

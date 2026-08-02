@@ -65,4 +65,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_movements_product ON stock_movements(product_id);
 `);
 
+// 이지어드민 재고 현황(공급처) 연동을 위해 나중에 추가된 컬럼. 기존 DB 파일에도 안전하게 추가.
+const productColumns = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+if (!productColumns.includes('supplier')) {
+  db.exec('ALTER TABLE products ADD COLUMN supplier TEXT');
+}
+
 module.exports = db;
